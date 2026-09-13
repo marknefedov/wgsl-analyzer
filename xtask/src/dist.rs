@@ -51,10 +51,10 @@ impl flags::Dist {
                 self.zig,
                 self.pgo,
             )?;
-            let release_tag = if stable {
-                date_iso(shell)?
-            } else {
-                "nightly".to_owned()
+            let release_tag = match shell.var("WA_RELEASE_TAG") {
+                Ok(tag) if !tag.is_empty() => tag,
+                _ if stable => date_iso(shell)?,
+                _ => "nightly".to_owned(),
             };
             dist_client(shell, &version, &release_tag, &target)?;
         } else {
