@@ -421,7 +421,6 @@ pub struct SourceAnalyzer<'db> {
     pub db: &'db dyn HirDatabase,
     pub body: &'db Body,
     pub body_source_map: &'db BodySourceMap,
-    pub infer: &'db InferenceResult,
     pub owner: DefinitionWithBodyId,
 }
 
@@ -431,14 +430,19 @@ impl<'db> SourceAnalyzer<'db> {
         definition: DefinitionWithBodyId,
     ) -> Self {
         let (body, body_source_map) = Body::with_source_map(db, definition);
-        let infer = InferenceResult::of(db, definition);
         Self {
             db,
             body,
             body_source_map,
-            infer,
             owner: definition,
         }
+    }
+
+    /// Type inference is only needed for type-dependent operations. Constructing
+    /// a resolver or looking up a source binding must not infer the body.
+    #[must_use]
+    pub fn infer(&self) -> &'db InferenceResult {
+        InferenceResult::of(self.db, self.owner)
     }
 
     #[must_use]
@@ -447,7 +451,7 @@ impl<'db> SourceAnalyzer<'db> {
         expression: &ast::Expression,
     ) -> Option<Type> {
         let id = self.expression_id(expression)?;
-        Some(self.infer[id])
+        Some(self.infer()[id])
     }
 
     #[must_use]
@@ -456,7 +460,7 @@ impl<'db> SourceAnalyzer<'db> {
         binding: &ast::Name,
     ) -> Option<Type> {
         let id = self.binding_id(binding)?;
-        Some(self.infer[id])
+        Some(self.infer()[id])
     }
 
     #[must_use]
@@ -465,7 +469,7 @@ impl<'db> SourceAnalyzer<'db> {
         field: ast::FieldExpression,
     ) -> Option<Field> {
         let expression = self.expression_id(&ast::Expression::FieldExpression(field))?;
-        let field = self.infer.field_resolution(expression)?;
+        let field = self.infer().field_resolution(expression)?;
 
         Some(Field { id: field })
     }

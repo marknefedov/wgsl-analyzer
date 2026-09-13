@@ -221,7 +221,9 @@ fn compute_statement_scopes(
         Statement::Compound { statements } => {
             let new_scope = scopes.new_block_scope(scope);
             scopes.set_scope_statement(statement_id, new_scope);
-            scope = compute_compound_statement_scopes(statements, body, scopes, new_scope);
+            // Bindings in a lexical block must not escape into following statements.
+            let _block_scope =
+                compute_compound_statement_scopes(statements, body, scopes, new_scope);
         },
         Statement::ConditionalCompound { statements } => {
             scope = compute_compound_statement_scopes(statements, body, scopes, scope);

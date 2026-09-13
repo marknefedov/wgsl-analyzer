@@ -22,5 +22,11 @@ tracing.workspace = true
 triomphe.workspace = true
 vfs.workspace = true
 
+[dev-dependencies]
+hir.workspace = true
+hir-def.workspace = true
+test-fixture.workspace = true
+syntax.workspace = true
+
 [lints]
 workspace = true

@@ -11,6 +11,7 @@ mod hover;
 pub mod inlay_hints;
 mod markup;
 mod navigation_target;
+mod references;
 pub mod signature_help;
 mod status;
 mod typing;
@@ -68,7 +69,7 @@ pub use crate::{
     // },
     // move_item::Direction,
     navigation_target::NavigationTarget,
-    // references::ReferenceSearchResult,
+    references::ReferenceSearchResult,
     // rename::RenameError,
     // runnables::{Runnable, RunnableKind, TestId, UpdateTest},
     // signature_help::SignatureHelp,
@@ -366,6 +367,13 @@ impl Analysis {
         file_id: FileId,
     ) -> Cancellable<Vec<Diagnostic>> {
         self.with_db(|db| ide_diagnostics::diagnostics(db, config, file_id))
+    }
+
+    pub fn references(
+        &self,
+        file_position: FilePosition,
+    ) -> Cancellable<Option<ReferenceSearchResult>> {
+        self.with_db(|db| references::references(db, file_position))
     }
 
     pub fn goto_definition(

@@ -625,3 +625,82 @@ pub(crate) fn vfs_path_to_file_id(
         FileExcluded::No => Ok(Some(file_id)),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[expect(
+        clippy::non_ascii_literal,
+        reason = "verify UTF-16 positions after a non-BMP character"
+    )]
+    fn references_locations_and_include_declaration() {
+        let fixture = test_fixture::ChangeFixture::parse(
+            r#"
+//- /shaders/package.wesl package:test root:/shaders edition:2026_pre
+const value = 1;
+//- /shaders/other.wesl
+fn main() { /* 🦀 */ let x = package::value; }
+"#,
+        );
+        let declaration_file = fixture.files[0];
+        let reference_file = fixture.files[1];
+        let root = AbsPathBuf::assert(test_utils::project_root().join("target/references-test"));
+        let config = Arc::new(Config::new(
+            root.clone(),
+            lsp_types::ClientCapabilities::default(),
+            vec![],
+            None,
+        ));
+        let mut vfs = Vfs::default();
+        let mut endings = FxHashMap::default();
+        let mut files = fixture.change.files_changed.clone();
+        files.sort_by_key(|(file, _)| *file);
+        for (file, text) in files {
+            let path = VfsPath::from(root.join(format!("{}.wesl", file.index())));
+            vfs.set_file_contents(path.clone(), text.map(String::into_bytes));
+            assert_eq!(vfs.file_id(&path).unwrap().0, file);
+            endings.insert(file, LineEndings::Unix);
+        }
+        let vfs = Arc::new(RwLock::new((vfs, endings)));
+        let mut host = AnalysisHost::default();
+        host.apply_change(fixture.change);
+        let declaration_uri = file_id_to_url(&vfs.read().0, declaration_file);
+        let reference_uri = file_id_to_url(&vfs.read().0, reference_file);
+        for include_declaration in [false, true] {
+            let snapshot = GlobalStateSnapshot {
+                config: Arc::clone(&config),
+                analysis: host.analysis(),
+                in_memory_documents: InMemoryDocuments::default(),
+                vfs: Arc::clone(&vfs),
+            };
+            let params = serde_json::from_value(serde_json::json!({
+                "textDocument": { "uri": declaration_uri },
+                "position": { "line": 0, "character": 6 },
+                "context": { "includeDeclaration": include_declaration }
+            }))
+            .unwrap();
+            let locations = crate::handlers::request::handle_references(snapshot, params)
+                .unwrap()
+                .unwrap();
+            let mut expected = serde_json::json!([{
+                "uri": reference_uri,
+                "range": {
+                    "start": { "line": 0, "character": 38 },
+                    "end": { "line": 0, "character": 43 }
+                }
+            }]);
+            if include_declaration {
+                expected.as_array_mut().unwrap().push(serde_json::json!({
+                    "uri": declaration_uri,
+                    "range": {
+                        "start": { "line": 0, "character": 6 },
+                        "end": { "line": 0, "character": 11 }
+                    }
+                }));
+            }
+            assert_eq!(serde_json::to_value(locations).unwrap(), expected);
+        }
+    }
+}

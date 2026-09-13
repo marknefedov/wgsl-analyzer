@@ -1941,10 +1941,8 @@ impl<'db> InferenceContext<'db> {
         )];
         let argument_types = arguments.iter().map(|(_, r#type)| *r#type).collect_vec();
         if argument_types.iter().any(|r#type| r#type.is_err(self.db)) {
-            debug_assert!(
-                !self.result.diagnostics.is_empty(),
-                "an error type should have a diagnostic already"
-            );
+            // The error can originate in a signature or another definition, so
+            // this body's diagnostic list need not contain it.
             return r#type;
         }
         let wgsl_arguments = self.converter.to_wt_vec(&argument_types);
@@ -1979,10 +1977,8 @@ impl<'db> InferenceContext<'db> {
         let template = &[TpltParam::Type(self.converter.to_wgsl_types(matrix.inner))];
         let argument_types = arguments.iter().map(|(_, r#type)| *r#type).collect_vec();
         if argument_types.iter().any(|r#type| r#type.is_err(self.db)) {
-            debug_assert!(
-                !self.result.diagnostics.is_empty(),
-                "an error type should have a diagnostic already"
-            );
+            // The error can originate in a signature or another definition, so
+            // this body's diagnostic list need not contain it.
             return r#type;
         }
         let wgsl_arguments = self.converter.to_wt_vec(&argument_types);

@@ -85,6 +85,32 @@ pub(crate) fn handle_analyzer_status(
     Ok(buffer)
 }
 
+pub(crate) fn handle_references(
+    snap: GlobalStateSnapshot,
+    parameters: lsp_types::ReferenceParams,
+) -> anyhow::Result<Option<Vec<lsp_types::Location>>> {
+    let _p = tracing::info_span!("handle_references").entered();
+    let position = try_default!(from_proto::file_position(
+        &snap,
+        &parameters.text_document_position_params
+    )?);
+    let Some(result) = snap.analysis.references(position)? else {
+        return Ok(None);
+    };
+    let locations = result
+        .references
+        .into_iter()
+        .chain(
+            parameters
+                .context
+                .include_declaration
+                .then_some(result.declaration),
+        )
+        .map(|range| to_proto::location(&snap, range))
+        .collect::<Cancellable<Vec<_>>>()?;
+    Ok(Some(locations))
+}
+
 pub(crate) fn handle_goto_definition(
     snap: GlobalStateSnapshot,
     parameters: DefinitionParams,

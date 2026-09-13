@@ -1,0 +1,2 @@
+# Represents a nested Cargo manifest without analyzer configuration.
+[workspace]

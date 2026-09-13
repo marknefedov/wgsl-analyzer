@@ -30,9 +30,16 @@ impl Definition {
         token: &SyntaxToken,
     ) -> Option<Self> {
         let parent = token.parent()?;
+        // A qualified path denotes its item only at its final segment.
+        if let Some(path) = ast::Path::cast(parent.clone())
+            && path.segments().last().as_ref() != Some(token)
+        {
+            return None;
+        }
         Self::from_node(semantics, file_id, &parent)
     }
 
+    #[must_use]
     pub fn from_node(
         semantics: &Semantics<'_>,
         file_id: EditionedFileId,
@@ -40,6 +47,9 @@ impl Definition {
     ) -> Option<Self> {
         match_ast! {
             match node {
+                ast::Name(name) => {
+                    resolve_name(semantics, file_id, &name)
+                },
                 ast::Path(name_ref) => {
                     resolve_path(semantics, file_id, &name_ref)
                 },
@@ -47,12 +57,113 @@ impl Definition {
                     resolve_field(semantics, file_id, field_expression)
                 },
                 _ => {
-                    tracing::warn!("attempted to go to definition {:?}", node);
                     None
                 }
             }
         }
     }
+}
+
+fn resolve_name(
+    semantics: &Semantics<'_>,
+    file_id: EditionedFileId,
+    name: &ast::Name,
+) -> Option<Definition> {
+    use crate::HasSource as _;
+    use hir_def::{
+        InFile,
+        db::DefinitionWithBodyId,
+        signature::{FieldId, StructSignature},
+    };
+
+    let parent = name.syntax().parent()?;
+    if let Some(item) = ast::ImportItem::cast(parent.clone()) {
+        let import = parent.ancestors().find_map(ast::ImportStatement::cast)?;
+        let mut segments: Vec<_> = parent
+            .ancestors()
+            .filter_map(ast::ImportPath::cast)
+            .map(|path| Some(Name::from(path.name()?.ident_token()?.text())))
+            .collect::<Option<_>>()?;
+        segments.reverse();
+        segments.push(Name::from(item.name()?.ident_token()?.text()));
+        let path = ModPath::from_segments(
+            hir_def::mod_path::PathKind::from_src(import.relative()),
+            segments,
+        );
+        return semantics
+            .resolver(file_id, import.syntax())
+            .resolve(semantics.db, &Path(path))
+            .ok()
+            .map(Definition::from);
+    }
+    // Resolve bindings by their source map, not by lookup in the surrounding scope.
+    if let Some(function) = parent.ancestors().find_map(ast::FunctionDeclaration::cast)
+        && function.syntax() != &parent
+    {
+        let id = semantics.function_to_def(&InFile::new(file_id, function))?;
+        if let Some(binding) = semantics
+            .analyze(DefinitionWithBodyId::Function(id))
+            .binding_id(name)
+        {
+            return Some(Definition::Local(Local {
+                parent: id,
+                binding,
+            }));
+        }
+    }
+    if let Some(member) = ast::StructMember::cast(parent.clone()) {
+        let declaration = parent.ancestors().find_map(ast::StructDeclaration::cast)?;
+        let id = semantics.global_struct_to_def(&InFile::new(file_id, declaration))?;
+        return StructSignature::of(semantics.db, id)
+            .fields()
+            .iter()
+            .find_map(|(field, _)| {
+                let field = Field {
+                    id: FieldId {
+                        r#struct: id,
+                        field,
+                    },
+                };
+                (field.source(semantics.db)?.value.syntax() == member.syntax())
+                    .then_some(Definition::Field(field))
+            });
+    }
+    let definition = match_ast! {
+        match parent {
+            ast::FunctionDeclaration(node) => {
+                Some(ModuleDef::Function(Function {
+                    id: semantics.function_to_def(&InFile::new(file_id, node))?,
+                }))
+            },
+            ast::VariableDeclaration(node) => {
+                Some(ModuleDef::GlobalVariable(GlobalVariable {
+                    id: semantics.global_variable_to_def(&InFile::new(file_id, node))?,
+                }))
+            },
+            ast::ConstantDeclaration(node) => {
+                Some(ModuleDef::GlobalConstant(GlobalConstant {
+                    id: semantics.global_constant_to_def(&InFile::new(file_id, node))?,
+                }))
+            },
+            ast::OverrideDeclaration(node) => {
+                Some(ModuleDef::Override(Override {
+                    id: semantics.global_override_to_def(&InFile::new(file_id, node))?,
+                }))
+            },
+            ast::StructDeclaration(node) => {
+                Some(ModuleDef::Struct(Struct {
+                    id: semantics.global_struct_to_def(&InFile::new(file_id, node))?,
+                }))
+            },
+            ast::TypeAliasDeclaration(node) => {
+                Some(ModuleDef::TypeAlias(TypeAlias {
+                    id: semantics.global_type_alias_to_def(&InFile::new(file_id, node))?,
+                }))
+            },
+            _ => None,
+        }
+    };
+    definition.map(Definition::ModuleDef)
 }
 
 impl From<ResolveKind> for Definition {

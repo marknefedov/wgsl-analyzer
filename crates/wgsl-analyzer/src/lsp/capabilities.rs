@@ -61,7 +61,7 @@ pub fn server_capabilities(config: &Config) -> ServerCapabilities {
         definition_provider: Some(DefinitionProvider::Bool(true)),
         type_definition_provider: None, // TODO https://github.com/wgsl-analyzer/wgsl-analyzer/issues/340
         implementation_provider: None,  // WGSL does not have "implementations"
-        references_provider: None, // TODO https://github.com/wgsl-analyzer/wgsl-analyzer/issues/347
+        references_provider: Some(lsp_types::ReferencesProvider::Bool(true)),
         document_highlight_provider: None, // TODO https://github.com/wgsl-analyzer/wgsl-analyzer/issues/348
         document_symbol_provider: None, // TODO https://github.com/wgsl-analyzer/wgsl-analyzer/issues/349
         workspace_symbol_provider: None, // TODO https://github.com/wgsl-analyzer/wgsl-analyzer/issues/350

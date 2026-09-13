@@ -1,0 +1,2 @@
+# Discovery checks eligibility through the supplied Cargo filter.
+[workspace]

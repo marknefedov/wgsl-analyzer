@@ -15,6 +15,9 @@ use triomphe::Arc;
 pub mod source_change;
 pub mod text_edit;
 
+#[cfg(test)]
+mod semantic_tests;
+
 #[salsa_macros::db]
 pub struct RootDatabase {
     // FIXME: Revisit this commit now that we migrated to the new salsa, given we store arcs in this

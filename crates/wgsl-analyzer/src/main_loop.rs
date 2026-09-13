@@ -956,6 +956,7 @@ impl GlobalState {
         // All other request handlers
         dispatcher
             .on::<NO_RETRY, DefinitionRequest>(handlers::request::handle_goto_definition)
+            .on::<NO_RETRY, lsp_types::ReferencesRequest>(handlers::request::handle_references)
             .on::<RETRY, CompletionRequest>(handlers::request::handle_completion)
             .on_fmt_thread::<DocumentFormattingRequest>(handlers::request::handle_formatting)
             .on::<RETRY, FoldingRangeRequest>(handlers::request::handle_folding_range)

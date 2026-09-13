@@ -255,7 +255,7 @@ fn find_cargo_metadata_table(
         .iter()
         .find(|package| package.manifest_path == manifest_path.as_str());
     let table = find
-        .unwrap()
+        .ok_or_else(|| anyhow!("no package for Cargo manifest {manifest_path}"))?
         .metadata
         .get("wgsl-analyzer")
         .ok_or_else(|| anyhow!("no wgsl-analyzer table in {manifest_path}"))?;
@@ -286,6 +286,41 @@ impl std::fmt::Display for DependencyError {
     }
 }
 impl std::error::Error for DependencyError {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unconfigured_cargo_projects_are_not_shader_projects() {
+        let root = paths::AbsPathBuf::assert_utf8(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/tests/virtual_workspace"),
+        );
+        for path in [root.clone(), root.join("member")] {
+            let (sender, receiver) = crossbeam_channel::unbounded();
+            let task = LoadPackageTask::discover_local(
+                &DiscoverArgument {
+                    path,
+                    search_parents: false,
+                },
+                sender,
+            );
+            assert!(task.is_none());
+            assert!(receiver.try_iter().next().is_none());
+        }
+    }
+
+    #[test]
+    fn virtual_workspace_has_no_package_metadata() {
+        let path = paths::AbsPathBuf::assert_utf8(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("src/tests/virtual_workspace/Cargo.toml"),
+        );
+        let manifest = ManifestPath::try_from(path).unwrap();
+        let error = find_cargo_metadata_table(&manifest).unwrap_err();
+        assert!(error.to_string().contains("no package for Cargo manifest"));
+    }
+}
 
 /// An enum containing either progress messages, an error,
 /// or the loaded project.

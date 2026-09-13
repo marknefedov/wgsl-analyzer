@@ -544,7 +544,7 @@ fn function_hints(
     let container = semantics.find_container(file_id, node)?;
     let analyzed = semantics.analyze(container.as_def_with_body_id()?);
     let expression = analyzed.expression_id(expression)?;
-    let resolved = analyzed.infer.call_resolution(expression)?;
+    let resolved = analyzed.infer().call_resolution(expression)?;
     let function = match resolved {
         ResolvedCall::Function(function) => function.lookup(analyzed.db),
         ResolvedCall::OtherTypeInitializer(_) => return None,

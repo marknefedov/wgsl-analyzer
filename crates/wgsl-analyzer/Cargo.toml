@@ -74,7 +74,7 @@ expect-test.workspace = true
 # xshell = "0.2.7"
 
 test-utils.workspace = true
-# test-fixture.workspace = true
+test-fixture.workspace = true
 # syntax-bridge.workspace = true
 
 [target."cfg(windows)".dependencies]

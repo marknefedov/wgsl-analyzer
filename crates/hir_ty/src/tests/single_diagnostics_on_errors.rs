@@ -3,6 +3,36 @@ use expect_test::expect;
 use crate::tests::check_infer;
 
 #[test]
+fn vector_constructor_error_from_struct_signature() {
+    check_infer(
+        "struct Data { value: Missing }\nvar<private> data: Data;\nfn main() { let result = vec3<f32>(data.value); }",
+        expect![[r#"
+            21..28 'Missing': `Missing` not found in scope
+            44..48 'data': ref<private, Data, read_write>
+            72..78 'result': vec3<f32>
+            81..102 'vec3<f...value)': vec3<f32>
+            91..95 'data': ref<private, Data, read_write>
+            91..101 'data.value': ref<private, [error], read_write>
+        "#]],
+    );
+}
+
+#[test]
+fn matrix_constructor_error_from_struct_signature() {
+    check_infer(
+        "struct Data { value: Missing }\nvar<private> data: Data;\nfn main() { let result = mat2x2<f32>(data.value); }",
+        expect![[r#"
+            21..28 'Missing': `Missing` not found in scope
+            44..48 'data': ref<private, Data, read_write>
+            72..78 'result': mat2x2<f32>
+            81..104 'mat2x2...value)': mat2x2<f32>
+            93..97 'data': ref<private, Data, read_write>
+            93..103 'data.value': ref<private, [error], read_write>
+        "#]],
+    );
+}
+
+#[test]
 fn array_generator_error_argument() {
     check_infer(
         "
