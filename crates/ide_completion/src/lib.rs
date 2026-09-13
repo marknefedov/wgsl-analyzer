@@ -5,6 +5,7 @@ mod config;
 mod context;
 pub mod item;
 mod patterns;
+mod protected;
 #[cfg(test)]
 mod tests;
 
@@ -69,8 +70,7 @@ pub fn completions(
 
     let dot = completions::dot::complete_dot(&mut completions, context);
     if dot.is_none() {
-        // TODO: make completions context-sensitive
-        // https://github.com/wgsl-analyzer/wgsl-analyzer/issues/1321
+        completions::syntax::complete_syntax(&mut completions, context);
         completions::expression::complete_names_in_scope(&mut completions, context);
     }
 

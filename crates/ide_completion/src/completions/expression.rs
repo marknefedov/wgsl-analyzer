@@ -25,11 +25,30 @@ pub(crate) fn complete_names_in_scope(
     context: &CompletionContext<'_>,
 ) -> Option<()> {
     match context.completion_location {
-        Some(ImmediateLocation::InsideStatement) => {},
+        Some(
+            ImmediateLocation::InsideStatement
+            | ImmediateLocation::StatementList { .. }
+            | ImmediateLocation::ForInitializer
+            | ImmediateLocation::Type,
+        ) => {},
         _ => return None,
     }
 
     context.resolver.process_all_names(|name, item| {
+        if matches!(context.completion_location, Some(ImmediateLocation::Type))
+            && !matches!(
+                &item,
+                ScopeDef::ModuleDefinition(
+                    ModuleDefinitionId::Struct(_) | ModuleDefinitionId::TypeAlias(_)
+                ) | ScopeDef::BuiltIn(
+                    hir_def::resolver::BuiltInKind::Alias(_)
+                        | hir_def::resolver::BuiltInKind::Type(_)
+                        | hir_def::resolver::BuiltInKind::TypeGenerator(_)
+                )
+            )
+        {
+            return;
+        }
         if name == &Name::missing() {
             return;
         }
