@@ -9,7 +9,7 @@
 
 use std::{fmt::Write as _, hint::black_box};
 
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::Criterion;
 use parser::parse_entrypoint_with_capabilities;
 use sha2::{Digest as _, Sha256};
 use syntax::{AstNode as _, Capabilities, ast::SourceFile};
@@ -57,5 +57,16 @@ fn large_file(criterion: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, large_file);
-criterion_main!(benches);
+fn main() {
+    // Match the analyzer's stack size; Windows gives the main thread only 1 MiB.
+    std::thread::Builder::new()
+        .stack_size(1 << 24)
+        .spawn(|| {
+            let mut criterion = Criterion::default().configure_from_args();
+            large_file(&mut criterion);
+            criterion.final_summary();
+        })
+        .expect("start benchmark thread")
+        .join()
+        .expect("benchmark thread panicked");
+}

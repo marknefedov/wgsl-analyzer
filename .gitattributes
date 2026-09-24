@@ -16,3 +16,6 @@ LICENSE text eol=lf
 *.yml text eol=lf
 *.ts text eol=lf
 *.mts text eol=lf
+
+# Keep the benchmark's checksum-protected input identical on every platform.
+crates/wgsl-formatter/benches/large_file.wesl text eol=lf
