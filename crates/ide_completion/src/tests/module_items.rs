@@ -245,7 +245,7 @@ fn complete_variable() {
             builtin constructor RayDesc
             builtin constructor RayIntersection
             builtin function abs
-            builtin type acceleration_structure
+            builtin type generator acceleration_structure
             builtin function acos
             builtin function acosh
             builtin function all
@@ -427,13 +427,13 @@ fn complete_variable() {
             builtin function rayQueryProceed
             builtin function rayQueryTerminate
             builtin enumerant ray_payload
-            builtin type ray_query
+            builtin type generator ray_query
             builtin enumerant read
             builtin enumerant read_write
             builtin function reflect
             builtin function refract
             builtin function reverseBits
-            builtin enumerant rg11b10float
+            builtin enumerant rg11b10ufloat
             builtin enumerant rg16float
             builtin enumerant rg16sint
             builtin enumerant rg16snorm
@@ -617,7 +617,7 @@ fn complete_keyword() {
             builtin constructor RayDesc
             builtin constructor RayIntersection
             builtin function abs
-            builtin type acceleration_structure
+            builtin type generator acceleration_structure
             builtin function acos
             builtin function acosh
             builtin function all
@@ -806,14 +806,14 @@ fn complete_keyword() {
             builtin function rayQueryProceed
             builtin function rayQueryTerminate
             builtin enumerant ray_payload
-            builtin type ray_query
+            builtin type generator ray_query
             builtin enumerant read
             builtin enumerant read_write
             builtin function reflect
             builtin function refract
             keyword return
             builtin function reverseBits
-            builtin enumerant rg11b10float
+            builtin enumerant rg11b10ufloat
             builtin enumerant rg16float
             builtin enumerant rg16sint
             builtin enumerant rg16snorm
@@ -999,7 +999,7 @@ fn complete_snippet() {
             builtin constructor RayDesc
             builtin constructor RayIntersection
             builtin function abs
-            builtin type acceleration_structure
+            builtin type generator acceleration_structure
             builtin function acos
             builtin function acosh
             builtin function all
@@ -1188,14 +1188,14 @@ fn complete_snippet() {
             builtin function rayQueryProceed
             builtin function rayQueryTerminate
             builtin enumerant ray_payload
-            builtin type ray_query
+            builtin type generator ray_query
             builtin enumerant read
             builtin enumerant read_write
             builtin function reflect
             builtin function refract
             keyword return
             builtin function reverseBits
-            builtin enumerant rg11b10float
+            builtin enumerant rg11b10ufloat
             builtin enumerant rg16float
             builtin enumerant rg16sint
             builtin enumerant rg16snorm
@@ -1382,7 +1382,7 @@ fn complete_constant() {
             builtin constructor RayDesc
             builtin constructor RayIntersection
             builtin function abs
-            builtin type acceleration_structure
+            builtin type generator acceleration_structure
             builtin function acos
             builtin function acosh
             builtin function all
@@ -1564,13 +1564,13 @@ fn complete_constant() {
             builtin function rayQueryProceed
             builtin function rayQueryTerminate
             builtin enumerant ray_payload
-            builtin type ray_query
+            builtin type generator ray_query
             builtin enumerant read
             builtin enumerant read_write
             builtin function reflect
             builtin function refract
             builtin function reverseBits
-            builtin enumerant rg11b10float
+            builtin enumerant rg11b10ufloat
             builtin enumerant rg16float
             builtin enumerant rg16sint
             builtin enumerant rg16snorm
@@ -1754,7 +1754,7 @@ fn complete_struct() {
             builtin constructor RayDesc
             builtin constructor RayIntersection
             builtin function abs
-            builtin type acceleration_structure
+            builtin type generator acceleration_structure
             builtin function acos
             builtin function acosh
             builtin function all
@@ -1936,13 +1936,13 @@ fn complete_struct() {
             builtin function rayQueryProceed
             builtin function rayQueryTerminate
             builtin enumerant ray_payload
-            builtin type ray_query
+            builtin type generator ray_query
             builtin enumerant read
             builtin enumerant read_write
             builtin function reflect
             builtin function refract
             builtin function reverseBits
-            builtin enumerant rg11b10float
+            builtin enumerant rg11b10ufloat
             builtin enumerant rg16float
             builtin enumerant rg16sint
             builtin enumerant rg16snorm
@@ -2110,7 +2110,7 @@ fn complete_type_alias() {
             ",
         expect![[r#"
             type alias Foo                 alias Foo
-            builtin type acceleration_structure
+            builtin type generator acceleration_structure
             builtin type generator array
             builtin type generator atomic
             builtin type generator binding_array
@@ -2148,7 +2148,7 @@ fn complete_type_alias() {
             builtin alias mat4x4f
             builtin alias mat4x4h
             builtin type generator ptr
-            builtin type ray_query
+            builtin type generator ray_query
             builtin type sampler
             builtin type sampler_comparison
             builtin type generator texture_1d

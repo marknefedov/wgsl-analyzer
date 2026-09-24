@@ -34,6 +34,7 @@ use salsa::{Cancelled, Database as _};
 use syntax::{Capabilities, ExtensionsConfig, Parse, SyntaxNode};
 use triomphe::Arc;
 use vfs::{FileId, VfsPath};
+use wgsl_formatter::FormattingOptions;
 
 use crate::signature_help::SignatureHelp;
 pub use crate::{
@@ -396,10 +397,11 @@ impl Analysis {
 
     pub fn format(
         &self,
+        config: &FormattingOptions,
         file_id: FileId,
         range: Option<TextRange>,
-    ) -> Cancellable<Option<SyntaxNode>> {
-        self.with_db(|db| formatting::format(db, file_id, range))
+    ) -> Cancellable<Option<wgsl_formatter::FormattedRange>> {
+        self.with_db(|db| formatting::format(db, config, file_id, range))
     }
 
     /// Returns a short text describing element at position.
