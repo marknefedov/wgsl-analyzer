@@ -38,6 +38,7 @@ pub enum AnyDiagnostic {
     },
     UnresolvedImport {
         id: InFile<AstPointer<ast::ImportStatement>>,
+        name: Name,
     },
     TooManySupers {
         id: InFile<AstPointer<ast::ImportStatement>>,
@@ -154,6 +155,9 @@ pub enum AnyDiagnostic {
         expression: InFile<AstPointer<ast::Expression>>,
         actual: Type,
     },
+    InvalidAddressOf {
+        expression: InFile<AstPointer<ast::Expression>>,
+    },
 }
 
 #[derive(Clone, Copy)]
@@ -186,6 +190,7 @@ impl AnyDiagnostic {
             | Self::WgslError { expression, message: _ }
             | Self::InvalidIdentExpression { expression, error: _ }
             | Self::UnexpectedReturnValue { expression, actual: _ }
+            | Self::InvalidAddressOf { expression }
             | Self::ExpectedLoweredKind { expression, actual: _, expected: _, path: _  } => {
                 expression.file_id
             },
@@ -209,7 +214,7 @@ impl AnyDiagnostic {
 
             Self::UnnamedImport { id }
             | Self::UnresolvedPackage { id, name: _ }
-            | Self::UnresolvedImport { id }
+            | Self::UnresolvedImport { id, name:_ }
             | Self::TooManySupers { id }
             | Self::DetachedFile { id } => {
                 id.file_id
@@ -398,6 +403,11 @@ pub(crate) fn to_any_diagnostic(
                 actual: *actual,
             }
         },
+        InferenceDiagnosticKind::InvalidAddressOf { expression } => {
+            let pointer = source_map.expression_to_source(*expression).ok()?.clone();
+            let source = InFile::new(file_id, pointer);
+            AnyDiagnostic::InvalidAddressOf { expression: source }
+        },
     })
 }
 
@@ -413,8 +423,9 @@ pub(crate) fn any_diag_from_def_diagnostic(
             id: id.ast_ptr(db),
             name: name.clone(),
         },
-        DefDiagnosticKind::UnresolvedImport { id } => {
-            AnyDiagnostic::UnresolvedImport { id: id.ast_ptr(db) }
+        DefDiagnosticKind::UnresolvedImport { id, name } => AnyDiagnostic::UnresolvedImport {
+            id: id.ast_ptr(db),
+            name: name.clone(),
         },
         DefDiagnosticKind::TooManySupers { id } => {
             AnyDiagnostic::TooManySupers { id: id.ast_ptr(db) }

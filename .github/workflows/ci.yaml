@@ -66,9 +66,11 @@ jobs:
               - 'Cargo.lock'
               - '.cargo/config.toml'
               - 'js/wgsl-analyzer-web/package.json'
+              - 'js/wgsl-analyzer-web/emscripten/**'
               - 'js/wgsl-analyzer-web/src/**'
               - 'js/wgsl-analyzer-web/tests/**'
               - 'js/examples/**'
+              - 'xtask/src/build_web.rs'
 
   no-ai-commits:
     runs-on: ubuntu-latest
@@ -132,7 +134,7 @@ jobs:
       #       ./crates/proc-macro-srv/proc-macro-test/imp -> target
 
       - name: Install nextest
-        uses: taiki-e/install-action@26e9283f268b880168bdbd2c545dfcd60ec2c6ab # v2.87.13
+        uses: taiki-e/install-action@94c31af3204a9f15ab40b35ad084410b905bbc73 # v2.87.17
         with:
           tool: nextest
 

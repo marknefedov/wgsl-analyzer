@@ -92,7 +92,7 @@ fn resolve_name(
         );
         return semantics
             .resolver(file_id, import.syntax())
-            .resolve(semantics.db, &Path(path))
+            .resolve_path(semantics.db, &Path(path))
             .ok()
             .map(Definition::from);
     }
@@ -201,7 +201,7 @@ fn resolve_path(
     {
         let resolver = semantics.resolver(file_id, path.syntax());
         resolver
-            .resolve(semantics.db, &Path(ModPath::from_src(path)))
+            .resolve_path(semantics.db, &Path(ModPath::from_src(path)))
             .ok()
             .map(Definition::from)
     } else if let Some(expression) = ast::FieldExpression::cast(parent) {

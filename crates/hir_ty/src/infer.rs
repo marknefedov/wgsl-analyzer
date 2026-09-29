@@ -831,16 +831,45 @@ impl<'db> InferenceContext<'db> {
                 expression,
                 case_blocks,
             } => {
-                let r#type = self.infer_expression(*expression, body).loaded(self.db);
+                let selector_type = self
+                    .infer_expression(*expression, body)
+                    .loaded(self.db)
+                    .concretize(self.db);
 
-                for (selectors, case) in case_blocks {
-                    for selector in selectors {
-                        if let SwitchCaseSelector::Expression(selector) = selector {
-                            self.infer_expression_expect(
-                                *selector,
-                                TypeExpectation::from_type(r#type),
+                if !selector_type.kind(self.db).is_numeric_scalar() {
+                    self.push_diagnostic(
+                        body.store_source,
+                        InferenceDiagnosticKind::TypeMismatch {
+                            expression: *expression,
+                            expected: TypeExpectation::Type(TypeExpectationInner::IntegerScalar),
+                            actual: selector_type,
+                        },
+                    );
+                }
+
+                for (case_selectors, case) in case_blocks {
+                    for case_selector in case_selectors {
+                        if let SwitchCaseSelector::Expression(case_selector_expression) =
+                            case_selector
+                        {
+                            let case_selector_type = self.infer_expression_expect(
+                                *case_selector_expression,
+                                TypeExpectation::from_type(selector_type),
                                 body,
                             );
+
+                            if !case_selector_type.kind(self.db).is_numeric_scalar() {
+                                self.push_diagnostic(
+                                    body.store_source,
+                                    InferenceDiagnosticKind::TypeMismatch {
+                                        expression: *case_selector_expression,
+                                        expected: TypeExpectation::Type(
+                                            TypeExpectationInner::IntegerScalar,
+                                        ),
+                                        actual: case_selector_type,
+                                    },
+                                );
+                            }
                         }
                     }
                     self.infer_statement(*case, body, return_type);
@@ -1350,6 +1379,13 @@ impl<'db> InferenceContext<'db> {
         if operand_type.is_err(self.db) {
             return self.error_type();
         }
+        if self.is_address_of_vector_component(operand, operator, store) {
+            self.push_diagnostic(
+                store.store_source,
+                InferenceDiagnosticKind::InvalidAddressOf { expression },
+            );
+            return self.error_type();
+        }
         // Load rule does not apply to this specific operator because it has precondition `r: ref<AS,T,AM>`
         let expression_type = if operator == UnaryOperator::AddressOf {
             operand_type
@@ -1386,10 +1422,6 @@ impl<'db> InferenceContext<'db> {
         let right_type = self.infer_expression(right_side, store);
 
         if left_type.is_err(self.db) || right_type.is_err(self.db) {
-            // debug_assert!(
-            //     !self.result.diagnostics.is_empty(),
-            //     "there should already be a diagnostic"
-            // );
             // no more useful type to return here
             return self.error_type();
         }
@@ -1690,10 +1722,6 @@ impl<'db> InferenceContext<'db> {
             //         .any(|r#type| r#type.is_err(self.db))
             //     {
             //         // cancel inference if an error is already known
-            //         debug_assert!(
-            //             !self.result.diagnostics.is_empty(),
-            //             "if an argument is an [error], then there should be a diagnostic already"
-            //         );
             //         return self.error_type();
             //     }
             //     self.infer_builtin_constructor(expression, argument_types, store, template, name)
@@ -1712,10 +1740,6 @@ impl<'db> InferenceContext<'db> {
             },
             Lowered::BuiltinFunction(name, template) => {
                 if argument_types.iter().any(|r#type| r#type.is_err(self.db)) {
-                    // debug_assert!(
-                    //     !self.result.diagnostics().is_empty(),
-                    //     "error instance should have a diagnostic associated with it already"
-                    // );
                     return self.error_type();
                 }
                 self.infer_builtin_function(
@@ -1757,10 +1781,6 @@ impl<'db> InferenceContext<'db> {
     // ) -> Type {
     //     let wgsl_arguments = self.converter.to_wt_vec(&argument_types);
     //     let Ok(template) = self.converter.to_maybe_vec_template(template_parameters) else {
-    //         debug_assert!(
-    //             !self.result.diagnostics().is_empty(),
-    //             "error instance should have a diagnostic associated with it already"
-    //         );
     //         return self.error_type();
     //     };
     //     if let Ok(value) =
@@ -1790,11 +1810,6 @@ impl<'db> InferenceContext<'db> {
     ) -> Type {
         let wgsl_arguments = self.converter.to_wt_vec(argument_types);
         let Ok(template) = self.converter.to_maybe_vec_template(template_parameters) else {
-            // assert fails with something like `sqrt<&y>(1)`
-            // debug_assert!(
-            //     !self.result.diagnostics().is_empty(),
-            //     "error instance should have a diagnostic associated with it already"
-            // );
             return self.error_type();
         };
         let return_type = wgsl_types::builtin::type_builtin_fn(
@@ -1872,13 +1887,7 @@ impl<'db> InferenceContext<'db> {
                 );
                 r#type // doesn't hurt to be helpful
             },
-            TypeKind::Error => {
-                debug_assert!(
-                    !self.result.diagnostics.is_empty(),
-                    "there should already be a diagnostic if we have an error"
-                );
-                r#type
-            },
+            TypeKind::Error => r#type,
         }
     }
 
@@ -2106,10 +2115,6 @@ impl<'db> InferenceContext<'db> {
         }
         let argument_types = arguments.iter().map(|(_, r#type)| *r#type).collect_vec();
         if argument_types.iter().any(|r#type| r#type.is_err(self.db)) {
-            // debug_assert!(
-            //     !self.result.diagnostics.is_empty(),
-            //     "an error type should have a diagnostic already"
-            // );
             return incomplete_type();
         }
         let wgsl_arguments = self.converter.to_wt_vec(&argument_types);
@@ -2153,10 +2158,6 @@ impl<'db> InferenceContext<'db> {
         let name = matrix_type.name();
         let argument_types = arguments.iter().map(|(_, r#type)| *r#type).collect_vec();
         if argument_types.iter().any(|r#type| r#type.is_err(self.db)) {
-            // debug_assert!(
-            //     !self.result.diagnostics.is_empty(),
-            //     "an error type should have a diagnostic already"
-            // );
             return incomplete_type();
         }
         let wgsl_arguments = self.converter.to_wt_vec(&argument_types);
@@ -2189,10 +2190,6 @@ impl<'db> InferenceContext<'db> {
         }
         let argument_types = arguments.iter().map(|(_, r#type)| *r#type).collect_vec();
         if argument_types.iter().any(|r#type| r#type.is_err(self.db)) {
-            // debug_assert!(
-            //     !self.result.diagnostics.is_empty(),
-            //     "an error type should have a diagnostic already"
-            // );
             return r#type;
         }
         let wgsl_arguments = self.converter.to_wt_vec(&argument_types);
@@ -2239,10 +2236,6 @@ impl<'db> InferenceContext<'db> {
         }
         let argument_types = arguments.iter().map(|(_, r#type)| *r#type).collect_vec();
         if argument_types.iter().any(|r#type| r#type.is_err(self.db)) {
-            // debug_assert!(
-            //     !self.result.diagnostics.is_empty(),
-            //     "an error type should have a diagnostic already"
-            // );
             return r#type;
         }
 
@@ -2296,10 +2289,6 @@ impl<'db> InferenceContext<'db> {
         }
         let argument_types = arguments.iter().map(|(_, r#type)| *r#type).collect_vec();
         if argument_types.iter().any(|r#type| r#type.is_err(self.db)) {
-            // debug_assert!(
-            //     !self.result.diagnostics.is_empty(),
-            //     "an error type should have a diagnostic already"
-            // );
             return r#type;
         }
 
@@ -2337,6 +2326,34 @@ impl<'db> InferenceContext<'db> {
         let r#type = context.lower_type(type_ref);
         self.push_lowering_diagnostics(context.diagnostics, store);
         r#type
+    }
+
+    fn is_address_of_vector_component(
+        &mut self,
+        expression: ExpressionId,
+        operator: UnaryOperator,
+        store: &ExpressionStore,
+    ) -> bool {
+        if operator != UnaryOperator::AddressOf {
+            return false;
+        }
+
+        #[expect(clippy::wildcard_enum_match_arm, reason = "too long")]
+        let left_side = match &store[expression] {
+            Expression::Index { left_side, .. } => left_side,
+            Expression::Field {
+                expression: left_side,
+                name,
+                ..
+            } if name.as_str().len() == 1 => left_side,
+            _ => return false,
+        };
+
+        matches!(
+            self.infer_expression(*left_side, store).kind(self.db),
+            TypeKind::Reference(Reference { inner, .. })
+                if matches!(inner.kind(self.db), TypeKind::Vector(_))
+        )
     }
 }
 

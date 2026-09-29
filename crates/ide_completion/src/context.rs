@@ -1,6 +1,6 @@
 use base_db::{EditionedFileId, FilePosition, TextRange};
 use hir::{ChildContainer, Semantics, nearest_scope};
-use hir_def::{item_scope::ItemScope, resolver::Resolver};
+use hir_def::resolver::Resolver;
 use ide_db::RootDatabase;
 use syntax::{AstNode as _, SyntaxToken, ast};
 
@@ -55,8 +55,7 @@ impl<'db> CompletionContext<'db> {
             .and_then(SyntaxToken::parent)
             .and_then(|parent| semantics.find_container(file_id, &parent));
 
-        let module_info = ItemScope::of(db, file_id);
-        let mut resolver = Resolver::new(file_id, module_info);
+        let mut resolver = Resolver::new(db, file_id);
 
         let nearest_scope = token
             .as_ref()

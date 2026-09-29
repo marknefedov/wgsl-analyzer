@@ -249,7 +249,6 @@ pub fn diagnostics(
                     let expected_pretty = ty::pretty::pretty_type_expectation(db, expected);
                     let actual_pretty = ty::pretty::pretty_type(db, actual);
                     let frange = original_file_range(db, expression.file_id, source.syntax());
-                    //debug_assert!(!actual.is_err(db), "{:?} expected {expected_pretty}, found {actual_pretty}", frange.range);
                     Diagnostic::new(
                         DiagnosticCode("2"),
                         format!("expected {expected_pretty}, found {actual_pretty}"),
@@ -519,12 +518,12 @@ pub fn diagnostics(
                         frange.range,
                     )
                 },
-                AnyDiagnostic::UnresolvedImport { id } => {
+                AnyDiagnostic::UnresolvedImport { id, name } => {
                     let source = id.value.to_node(&root);
                     let frange = original_file_range(db, id.file_id, source.syntax());
                     Diagnostic::new(
                         DiagnosticCode("27"),
-                        "could not resolve import".to_owned(),
+                        format!("could not resolve import to `{}`", name.as_str()),
                         frange.range,
                     )
                 },
@@ -577,6 +576,15 @@ pub fn diagnostics(
                     Diagnostic::new(
                         DiagnosticCode("33"),
                         format!("unexpected return value of type `{type}` in function with no return type"),
+                        frange.range,
+                    )
+                },
+                AnyDiagnostic::InvalidAddressOf { expression } => {
+                    let source = expression.value.to_node(&root);
+                    let frange = original_file_range(db, expression.file_id, source.syntax());
+                    Diagnostic::new(
+                        DiagnosticCode("34"),
+                        "cannot take the address of a vector component".to_owned(),
                         frange.range,
                     )
                 },

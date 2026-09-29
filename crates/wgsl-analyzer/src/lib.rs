@@ -1,5 +1,6 @@
 //! The language server executable.
 
+mod builtin;
 pub mod cli;
 pub mod config;
 mod diagnostics;
@@ -36,36 +37,6 @@ where
     serde_json::from_value(json.clone())
         .map_err(|error| anyhow::anyhow!("Failed to deserialize {what}: {error}; {json}"))
 }
-
-#[derive(Debug)]
-struct LspError {
-    code: i32,
-    message: String,
-}
-
-impl LspError {
-    const fn new(
-        code: i32,
-        message: String,
-    ) -> Self {
-        Self { code, message }
-    }
-}
-
-impl std::fmt::Display for LspError {
-    fn fmt(
-        &self,
-        formatter: &mut std::fmt::Formatter<'_>,
-    ) -> std::fmt::Result {
-        write!(
-            formatter,
-            "Language Server request failed with {}. ({})",
-            self.code, self.message
-        )
-    }
-}
-
-impl std::error::Error for LspError {}
 
 #[doc(hidden)]
 macro_rules! try_default_ {

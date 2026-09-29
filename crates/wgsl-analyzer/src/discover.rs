@@ -12,9 +12,9 @@ use edition::Edition;
 use paths::AbsPathBuf;
 use project_model::{
     ManifestPath, PackageDependency, PackageKey, ProjectManifest, WeslManifest, WeslPackage,
-    WeslPackageRoot,
 };
 use stdx::process::spawn_with_streaming_output;
+use vfs::VfsPath;
 
 /// A longer running task to load a package.
 #[derive(Debug, Clone)]
@@ -60,7 +60,7 @@ impl LoadPackageTask {
     }
 
     pub(crate) fn package_key(&self) -> PackageKey {
-        PackageKey::from_manifest_path(match &self.manifest {
+        PackageKey::Manifest(match &self.manifest {
             ProjectManifest::ProjectJson(manifest_path)
             | ProjectManifest::WeslToml(manifest_path)
             | ProjectManifest::CargoToml(manifest_path) => manifest_path.clone(),
@@ -105,7 +105,10 @@ impl LoadPackageTask {
             ProjectManifest::ProjectJson(manifest_path) => bail!("project json not supported"),
         };
 
-        self.send(LoadPackageMessage::Finished { project });
+        self.send(LoadPackageMessage::Finished {
+            manifest: self.manifest.manifest_path().clone(),
+            project,
+        });
         Ok(())
     }
 
@@ -115,7 +118,9 @@ impl LoadPackageTask {
         wesl_toml: &WeslManifest,
     ) -> Result<WeslPackage, anyhow::Error> {
         let root = manifest_path.parent().join(&wesl_toml.root);
-        if !std::fs::metadata(&root)?.is_dir() {
+        let metadata = std::fs::metadata(&root)
+            .with_context(|| format!("failed to get metadata of root file '{root}'"))?;
+        if !metadata.is_dir() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 "wesl.toml root must point at a folder",
@@ -138,7 +143,7 @@ impl LoadPackageTask {
                         },
                         (None, Some(package)) => PackageDependency::Library { name, package },
                         (Some(path), None) => {
-                            let base = manifest_path.parent().join(path);
+                            let base = manifest_path.parent().join(&path);
                             let wesl_toml = base.join("wesl.toml");
                             // TODO: this isn't always a manifest
                             let cargo_toml = base.join("Cargo.toml");
@@ -185,9 +190,9 @@ impl LoadPackageTask {
             )
         })?;
         Ok(WeslPackage {
-            manifest: manifest_path.clone(),
+            manifest: VfsPath::from(manifest_path.as_abs_path()),
             display_name: manifest_path.parent().file_name().map(str::to_owned),
-            root,
+            root: VfsPath::from(root),
             origin: self.origin,
             dependencies,
             edition,
@@ -255,7 +260,7 @@ fn find_cargo_metadata_table(
         .iter()
         .find(|package| package.manifest_path == manifest_path.as_str());
     let table = find
-        .ok_or_else(|| anyhow!("no package for Cargo manifest {manifest_path}"))?
+        .with_context(|| "cargo toml is for the workspace")?
         .metadata
         .get("wgsl-analyzer")
         .ok_or_else(|| anyhow!("no wgsl-analyzer table in {manifest_path}"))?;
@@ -318,7 +323,11 @@ mod tests {
         );
         let manifest = ManifestPath::try_from(path).unwrap();
         let error = find_cargo_metadata_table(&manifest).unwrap_err();
-        assert!(error.to_string().contains("no package for Cargo manifest"));
+        assert!(
+            error
+                .to_string()
+                .contains("cargo toml is for the workspace")
+        );
     }
 }
 
@@ -327,6 +336,7 @@ mod tests {
 #[derive(Debug, Clone)]
 pub enum LoadPackageMessage {
     Finished {
+        manifest: ManifestPath,
         project: WeslPackage,
     },
     Dependency {

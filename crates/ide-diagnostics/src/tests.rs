@@ -8,6 +8,7 @@ use test_fixture::WithFixture as _;
 
 use crate::{Diagnostic, DiagnosticsConfig, Severity};
 
+mod naga;
 mod tint;
 
 fn check_diagnostics(
@@ -367,16 +368,16 @@ fn invalid_translate_attribute_body_switch_statement() {
         "
 fn foo()
 {
-switch true
+switch 1
 @if(true)
 {
-    case true: { return; }
+    case 1: { return; }
     default: { return; }
 }
 }
 ",
         expect![[r#"
-            23..32 wgsl-analyzer Error 16: translate-time attribute `@if` is not allowed on a switch body
+            20..29 wgsl-analyzer Error 16: translate-time attribute `@if` is not allowed on a switch body
         "#]],
     );
 }
@@ -386,15 +387,15 @@ fn invalid_translate_attribute_body_switch_clause() {
     check_diagnostics(
         "
 fn foo() {
-switch true
+switch 1
 {
-    case true: @if(true) { return; }
+    case 1: @if(true) { return; }
     default: { return; }
 }
 }
 ",
         expect![[r#"
-            40..49 wgsl-analyzer Error 16: translate-time attribute `@if` is not allowed on a switch default clause body
+            34..43 wgsl-analyzer Error 16: translate-time attribute `@if` is not allowed on a switch default clause body
         "#]],
     );
 }
@@ -411,7 +412,6 @@ loop
 ",
         expect![[r#"
             16..25 wgsl-analyzer Error 16: translate-time attribute `@if` is not allowed on a loop body
-            40..41 wgsl-analyzer Error 16: attributes must precede a statement here
         "#]],
     );
 }
@@ -482,7 +482,6 @@ loop {
 ",
         expect![[r#"
             37..46 wgsl-analyzer Error 16: translate-time attribute `@if` is not allowed on a continuing body
-            52..53 wgsl-analyzer Error 16: attributes must precede a statement here
         "#]],
     );
 }
@@ -725,6 +724,21 @@ fn foo() {
 ",
         expect![[r#"
             61..62 wgsl-analyzer Error 1: cannot assign to value with `read` access mode
+        "#]],
+    );
+}
+
+#[test]
+fn address_of_vector_component() {
+    check_diagnostics(
+        "
+var<private> v: vec3f;
+fn foo() {
+    let invalid = &v[2];
+}
+",
+        expect![[r#"
+            52..57 wgsl-analyzer Error 34: cannot take the address of a vector component
         "#]],
     );
 }

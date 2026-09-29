@@ -258,10 +258,6 @@ impl<'db> InferPrinter<'db> {
                 parameters,
                 r#type,
             } => {
-                debug_assert!(
-                    !r#type.is_err(self.db),
-                    "don't give a diagnostic for downstream issues"
-                );
                 self.print_no_constructor(source_map, buffer, *expression, parameters, *r#type);
             },
             InferenceDiagnosticKind::NoOverload {
@@ -318,6 +314,9 @@ impl<'db> InferPrinter<'db> {
                     *n_actual,
                     *n_expected,
                 );
+            },
+            InferenceDiagnosticKind::InvalidAddressOf { expression } => {
+                self.print_invalid_address_of(source_map, buffer, *expression);
             },
         }
     }
@@ -659,6 +658,23 @@ impl<'db> InferPrinter<'db> {
         writeln!(
             buffer,
             "{range:?} '{}': expected `{n_expected}` arguments, but received `{n_actual}`",
+            ellipsize(text, 15),
+        )
+        .unwrap();
+    }
+
+    fn print_invalid_address_of(
+        &self,
+        source_map: &ExpressionSourceMap,
+        buffer: &mut String,
+        expression: ExpressionId,
+    ) {
+        let Some((range, text)) = self.get_expression_range_text(source_map, expression) else {
+            return;
+        };
+        writeln!(
+            buffer,
+            "{range:?} '{}': cannot take the address of a vector component",
             ellipsize(text, 15),
         )
         .unwrap();

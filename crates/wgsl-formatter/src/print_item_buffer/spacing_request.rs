@@ -272,7 +272,11 @@ impl Request {
             //    if left_cond { combine(left_true, right_false) } else { combine(left_false, right_false) }
             // }
             (
-                request_left @ Self::Conditional { .. },
+                request_left @ Self::Conditional {
+                    condition: _,
+                    on_true: _,
+                    on_false: _,
+                },
                 Self::Conditional {
                     condition,
                     on_true,
@@ -395,9 +399,8 @@ pub(crate) mod tests {
     use dprint_core::formatting::condition_resolvers;
     use expect_test::expect;
 
-    use crate::print_item_buffer::{PrintItemBuffer, spacing_request::Request};
-
     use super::RequestItem;
+    use crate::print_item_buffer::{PrintItemBuffer, spacing_request::Request};
 
     fn format_width(
         pib: PrintItemBuffer,
