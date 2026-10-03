@@ -70,7 +70,7 @@ jobs:
               - 'js/wgsl-analyzer-web/src/**'
               - 'js/wgsl-analyzer-web/tests/**'
               - 'js/examples/**'
-              - 'xtask/src/build_web.rs'
+              - 'xtask/src/dist_web.rs'
 
   no-ai-commits:
     runs-on: ubuntu-latest
@@ -134,7 +134,7 @@ jobs:
       #       ./crates/proc-macro-srv/proc-macro-test/imp -> target
 
       - name: Install nextest
-        uses: taiki-e/install-action@94c31af3204a9f15ab40b35ad084410b905bbc73 # v2.87.17
+        uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
         with:
           tool: nextest
 
@@ -275,7 +275,7 @@ jobs:
           persist-credentials: false
 
       - name: Check for typos
-        uses: crate-ci/typos@512fc24f32f44ab01972217aaaf3dc86ec234d53 # v1.50.2
+        uses: crate-ci/typos@00f422f3b19c57bc6338715ebfe3316d38768461 # v1.50.3
 
       - name: Typos info
         if: failure()
@@ -546,7 +546,7 @@ jobs:
         working-directory: ./js
 
       - name: Build the wasm module and the package
-        run: cargo xtask build-web
+        run: cargo xtask dist-web
 
       - name: Boot the module and round trip LSP
         run: pnpm --filter wgsl-analyzer-web run test:smoke

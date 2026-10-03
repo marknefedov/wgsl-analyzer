@@ -24,14 +24,8 @@ pub(crate) fn complete_names_in_scope(
     accumulator: &mut Completions,
     context: &CompletionContext<'_>,
 ) -> Option<()> {
-    match context.completion_location {
-        Some(
-            ImmediateLocation::InsideStatement
-            | ImmediateLocation::StatementList { .. }
-            | ImmediateLocation::ForInitializer
-            | ImmediateLocation::Type,
-        ) => {},
-        _ => return None,
+    if !is_name_location(context.completion_location.as_ref()) {
+        return None;
     }
 
     context.resolver.process_all_names(|name, item| {
@@ -125,6 +119,24 @@ pub(crate) fn complete_names_in_scope(
         completion.add_to(accumulator, context.db);
     });
     None
+}
+
+const fn is_name_location(location: Option<&ImmediateLocation>) -> bool {
+    matches!(
+        location,
+        Some(
+            ImmediateLocation::InsideStatement
+                | ImmediateLocation::StatementList {
+                    break_allowed: _,
+                    continue_allowed: _,
+                    return_allowed: _,
+                    continuing_allowed: _,
+                    else_allowed: _,
+                }
+                | ImmediateLocation::ForInitializer
+                | ImmediateLocation::Type
+        )
+    )
 }
 
 fn render_detail(

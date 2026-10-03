@@ -59,8 +59,6 @@ xflags::xflags! {
             /// Use jemalloc allocator for server
             optional --jemalloc
             optional --client-patch-version version: String
-            /// Use cargo-zigbuild
-            optional --zig
             /// Apply PGO optimizations
             optional --pgo pgo: PgoTrainingCrate
         }
@@ -90,10 +88,12 @@ xflags::xflags! {
             optional since: String
         }
 
-        /// Builds the JavaScript package.
-        cmd build-web {
+        /// Builds the JavaScript package and packs it into `dist/`.
+        cmd dist-web {
             /// Build in release configuration.
             optional --release
+            /// Stamp the package with its release version for this patch version.
+            optional --client-patch-version version: String
         }
     }
 }
@@ -117,7 +117,7 @@ pub enum XtaskCmd {
     Codegen(Codegen),
     Tidy(Tidy),
     Changelog(Changelog),
-    BuildWeb(BuildWeb),
+    DistWeb(DistWeb),
 }
 
 #[derive(Debug)]
@@ -144,7 +144,6 @@ pub struct Dist {
     pub mimalloc: bool,
     pub jemalloc: bool,
     pub client_patch_version: Option<String>,
-    pub zig: bool,
     pub pgo: Option<PgoTrainingCrate>,
 }
 
@@ -176,8 +175,9 @@ pub struct Changelog {
 }
 
 #[derive(Debug)]
-pub struct BuildWeb {
+pub struct DistWeb {
     pub release: bool,
+    pub client_patch_version: Option<String>,
 }
 
 impl Xtask {
