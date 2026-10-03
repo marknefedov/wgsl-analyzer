@@ -21,7 +21,7 @@ path = "src/bin/main.rs"
 # ide-ssr.workspace = true
 # intern.workspace = true
 # This should only be used in CLI
-# profile.workspace = true
+profile.workspace = true
 base-db.workspace = true
 edition.workspace = true
 hir-ty.workspace = true
@@ -39,7 +39,7 @@ wgsl-std.workspace = true
 
 # base64 = "0.22"
 # dirs = "5.0.1"
-# mimalloc = { version = "0.1.48", default-features = false, optional = true }
+mimalloc = { version = "0.1.52", default-features = false, optional = true }
 # process-wrap = { version = "8.2.0", features = ["std"] }
 # scip = "0.5.2"
 # tenthash = "1.0.0"
@@ -56,7 +56,7 @@ line-index.workspace = true
 lsp-server.workspace = true
 lsp-types = { package = "gen-lsp-types", version = "0.11.0", features = ["url"] }
 percent-encoding = "2.3.2"
-memchr = "2.8.1"
+memchr = "2.8.3"
 nohash-hasher.workspace = true
 num_cpus = "1.17.0"
 parking_lot = "0.12.5"
@@ -81,9 +81,12 @@ test-utils.workspace = true
 test-fixture.workspace = true
 # syntax-bridge.workspace = true
 
+[target.'cfg(not(target_env = "msvc"))'.dependencies]
+jemallocator = { package = "tikv-jemallocator", version = "0.7.0", optional = true }
+
 [target."cfg(windows)".dependencies]
 windows-sys = {
-	version = "0.61",
+	version = "0.61.2",
 	features = [
 		"Win32_System_Diagnostics_Debug",
 		"Win32_System_Threading",
@@ -92,6 +95,7 @@ windows-sys = {
 
 [features]
 force-always-assert = ["stdx/force-always-assert"]
+jemalloc = ["jemallocator", "profile/jemalloc"]
 sysroot-abi = []
 
 [lints]

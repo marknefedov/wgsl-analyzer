@@ -20,14 +20,55 @@ use crate::{
 
 const VERSION_STABLE: &str = "0.11";
 const VERSION_NIGHTLY: &str = "0.12";
-const VERSION_DEV: &str = "0.13"; // keep this one in sync with `package.json`
+/// Keep this one in sync with every `package.json` that `patch_version` patches.
+pub(crate) const VERSION_DEV: &str = "0.13";
+
+pub(crate) fn is_stable(shell: &Shell) -> bool {
+    shell.var("GITHUB_REF").unwrap_or_default().as_str() == "refs/heads/release"
+}
+
+pub(crate) fn client_version(
+    shell: &Shell,
+    patch_version: &str,
+) -> String {
+    if is_stable(shell) {
+        format!("{VERSION_STABLE}.{patch_version}")
+    } else {
+        // A hack to make VS Code prefer nightly over stable.
+        format!("{VERSION_NIGHTLY}.{patch_version}")
+    }
+}
+
+/// npm has no pre-release channel, so nightlies are semver prereleases of the
+/// next stable version: semver ranges and update bots then skip them.
+pub(crate) fn web_version(
+    shell: &Shell,
+    patch_version: &str,
+) -> String {
+    if is_stable(shell) {
+        format!("{VERSION_STABLE}.{patch_version}")
+    } else {
+        format!("{VERSION_NIGHTLY}.0-next.{patch_version}")
+    }
+}
+
+/// Replaces the `VERSION_DEV` placeholder version in a `package.json`.
+pub(crate) fn patch_version<'patch>(
+    patch: &'patch mut Patch,
+    version: &str,
+) -> &'patch mut Patch {
+    patch.replace(
+        &format!(r#""version": "{VERSION_DEV}.0-dev""#),
+        &format!(r#""version": "{version}""#),
+    )
+}
 
 impl flags::Dist {
     pub(crate) fn run(
         self,
         shell: &Shell,
     ) -> anyhow::Result<()> {
-        let stable = shell.var("GITHUB_REF").unwrap_or_default().as_str() == "refs/heads/release";
+        let stable = is_stable(shell);
 
         let project_root = project_root();
         let target = Target::get(&project_root, shell);
@@ -37,18 +78,12 @@ impl flags::Dist {
         shell.create_dir(&dist)?;
 
         if let Some(patch_version) = self.client_patch_version {
-            let version = if stable {
-                format!("{VERSION_STABLE}.{patch_version}")
-            } else {
-                // A hack to make VS Code prefer nightly over stable.
-                format!("{VERSION_NIGHTLY}.{patch_version}")
-            };
+            let version = client_version(shell, &patch_version);
             dist_server(
                 shell,
                 &format!("{version}-standalone"),
                 &target,
                 allocator,
-                self.zig,
                 self.pgo,
             )?;
             let release_tag = match shell.var("WA_RELEASE_TAG") {
@@ -58,14 +93,7 @@ impl flags::Dist {
             };
             dist_client(shell, &version, &release_tag, &target)?;
         } else {
-            dist_server(
-                shell,
-                "0.0.0-standalone",
-                &target,
-                allocator,
-                self.zig,
-                self.pgo,
-            )?;
+            dist_server(shell, "0.0.0-standalone", &target, allocator, self.pgo)?;
         }
         Ok(())
     }
@@ -87,11 +115,7 @@ fn dist_client(
     let _d = shell.push_dir("./editors/code");
 
     let mut patch = Patch::new(shell, "./package.json")?;
-    patch
-        .replace(
-            &format!(r#""version": "{VERSION_DEV}.0-dev""#),
-            &format!(r#""version": "{version}""#),
-        )
+    patch_version(&mut patch, version)
         .replace(
             r#""releaseTag": null"#,
             &format!(r#""releaseTag": "{release_tag}""#),
@@ -109,51 +133,46 @@ fn dist_server(
     release: &str,
     target: &Target,
     allocator: Malloc,
-    zig: bool,
     pgo: Option<PgoTrainingCrate>,
 ) -> anyhow::Result<()> {
     let _e = shell.push_env("CFG_RELEASE", release);
+    let _e = shell.push_env("CARGO_PROFILE_RELEASE_DEBUG", "limited");
     let _e = shell.push_env("CARGO_PROFILE_RELEASE_LTO", "thin");
+    let _e = shell.push_env("CARGO_PROFILE_RELEASE_CODEGEN_UNITS", "1");
+    let _e = shell.push_env("CARGO_PROFILE_DEV_REL_DEBUG", "limited");
+    let _e = shell.push_env("CARGO_PROFILE_DEV_REL_LTO", "thin");
+    let _e = shell.push_env("CARGO_PROFILE_DEV_REL_CODEGEN_UNITS", "1");
 
-    // Uncomment to enable debug info for releases. Note that:
-    //   * debug info is split on windows and macs, so it does nothing for those platforms,
-    //   * on Linux, this blows up the binary size from 8MB to 43MB, which is unreasonable.
-    // let _e = sh.push_env("CARGO_PROFILE_RELEASE_DEBUG", "1");
-
-    let linux_target = target.is_linux();
-    let target_name = match &target.libc_suffix {
-        Some(libc_suffix) if zig => format!("{}.{libc_suffix}", target.name),
-        _ => target.name.clone(),
-    };
     let features = allocator.to_features();
-    let command = if linux_target && zig {
-        "zigbuild"
-    } else {
-        "build"
-    };
 
+    let cmd = build_command(shell, &target.name, features);
     let pgo_profile = if let Some(train_crate) = pgo {
         Some(crate::pgo::gather_pgo_profile(
             shell,
-            crate::pgo::build_command(shell, command, &target_name, features),
-            &target_name,
+            cmd,
+            &target.name,
             &train_crate,
         )?)
     } else {
         None
     };
 
-    let mut cmd = build_command(shell, command, &target_name, features);
+    let mut cmd = build_command(shell, &target.name, features);
+    let mut rustflags = Vec::new();
     if let Some(profile) = pgo_profile {
-        cmd = cmd.env(
-            "RUSTFLAGS",
-            format!("-Cprofile-use={}", profile.to_str().unwrap()),
-        );
+        rustflags.push(format!("-Cprofile-use={}", profile.to_str().unwrap()));
+    }
+    if target.name.ends_with("-windows-msvc") {
+        // https://github.com/rust-lang/rust-analyzer/issues/20970
+        rustflags.push("-Ctarget-feature=+crt-static".to_owned());
+    }
+    if !rustflags.is_empty() {
+        cmd = cmd.env("RUSTFLAGS", rustflags.join(" "));
     }
     cmd.run().context("cannot build wgsl-analyzer")?;
 
     let dst = Path::new("dist").join(&target.artifact_name);
-    if target_name.contains("-windows-") {
+    if target.name.contains("-windows-") {
         zip(
             &target.server_path,
             target.symbols_path.as_deref(),
@@ -168,13 +187,12 @@ fn dist_server(
 
 fn build_command<'shell>(
     shell: &'shell Shell,
-    command: &str,
     target_name: &str,
     features: &[&str],
 ) -> Cmd<'shell> {
     cmd!(
         shell,
-        "cargo {command} --manifest-path ./crates/wgsl-analyzer/Cargo.toml --bin wgsl-analyzer --target {target_name} {features...} --release"
+        "cargo build --manifest-path ./crates/wgsl-analyzer/Cargo.toml --bin wgsl-analyzer --target {target_name} {features...} --release"
     )
 }
 
@@ -236,7 +254,6 @@ fn system_time_to_zip_datetime(
 
 struct Target {
     name: String,
-    libc_suffix: Option<String>,
     server_path: PathBuf,
     symbols_path: Option<PathBuf>,
     artifact_name: String,
@@ -248,10 +265,6 @@ impl Target {
         shell: &Shell,
     ) -> Self {
         let name = detect_target(shell);
-        let (name, libc_suffix) = match name.split_once('.') {
-            Some((left, right)) => (left.to_owned(), Some(right.to_owned())),
-            None => (name, None),
-        };
         let out_path = project_root.join("target").join(&name).join("release");
         let (exe_suffix, symbols_path) = if name.contains("-windows-") {
             (".exe".into(), Some(out_path.join("wgsl_analyzer.pdb")))
@@ -262,26 +275,21 @@ impl Target {
         let artifact_name = format!("wgsl-analyzer-{name}{exe_suffix}");
         Self {
             name,
-            libc_suffix,
             server_path,
             symbols_path,
             artifact_name,
         }
     }
-
-    fn is_linux(&self) -> bool {
-        self.name.contains("-linux-")
-    }
 }
 
-struct Patch {
+pub(crate) struct Patch {
     path: PathBuf,
     original_contents: String,
     contents: String,
 }
 
 impl Patch {
-    fn new<Path>(
+    pub(crate) fn new<Path>(
         shell: &Shell,
         path: Path,
     ) -> anyhow::Result<Self>
@@ -307,7 +315,7 @@ impl Patch {
         self
     }
 
-    fn commit(
+    pub(crate) fn commit(
         &self,
         shell: &Shell,
     ) -> anyhow::Result<()> {
