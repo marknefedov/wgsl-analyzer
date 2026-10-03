@@ -240,7 +240,7 @@ fn replacement_ranges() {
         ("var<sto$0rage>", "storage", "var<storage>"),
         ("@builtin(pos$0ition)", "position", "@builtin(position)"),
         (
-            "@interpolate(flat, ei$0ther)",
+            "@interpolate(flat, ei$0ther)", // spellchecker:disable-line
             "either",
             "@interpolate(flat, either)",
         ),

@@ -27,7 +27,13 @@ pub(crate) fn complete_names_in_scope(
     match context.completion_location {
         Some(
             ImmediateLocation::InsideStatement
-            | ImmediateLocation::StatementList { .. }
+            | ImmediateLocation::StatementList {
+                break_allowed: _,
+                continue_allowed: _,
+                return_allowed: _,
+                continuing_allowed: _,
+                else_allowed: _,
+            }
             | ImmediateLocation::ForInitializer
             | ImmediateLocation::Type,
         ) => {},
