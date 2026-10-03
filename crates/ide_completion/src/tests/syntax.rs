@@ -309,23 +309,26 @@ fn attribute_chains_and_for_initializers() {
         assert!(names.iter().any(|name| name == "var"), "{source}");
         assert!(!names.iter().any(|name| name == "return"), "{source}");
     }
-    assert!(labels("fn f(){ loop { continuing { break if true; $0 } } }").is_empty());
+    assert_eq!(
+        labels("fn f(){ loop { continuing { break if true; $0 } } }"),
+        Vec::<String>::new()
+    );
 }
 
 #[test]
 fn array_lengths_preserve_expression_completion() {
     let source = "const COUNT = 4u; fn f() { var values: array<u32, CO$0>; }";
     assert!(labels(source).iter().any(|name| name == "COUNT"));
-    assert!(keywords(source).is_empty());
+    assert_eq!(keywords(source), Vec::<String>::new());
     let source = "fn f() { let counts = vec2u(2, 4); var values: array<u32, counts.x$0>; }";
     let (db, position) = crate::tests::position(source);
     let context =
         crate::context::CompletionContext::new(&db, position, &TEST_CONFIG, None).unwrap();
     assert!(matches!(
         context.completion_location,
-        Some(crate::context::ImmediateLocation::FieldAccess { .. })
+        Some(crate::context::ImmediateLocation::FieldAccess { expression: _ })
     ));
-    assert!(keywords(source).is_empty());
+    assert_eq!(keywords(source), Vec::<String>::new());
 }
 
 #[test]
