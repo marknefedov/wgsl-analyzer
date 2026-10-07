@@ -25,16 +25,16 @@ use syntax::{AstNode as _, Edition};
 use vfs::FileId;
 
 use crate::{
-    naga::{Naga27, Naga28, Naga29, NagaMain, naga_diagnostics},
+    naga::{Naga28, Naga29, Naga30, NagaMain, naga_diagnostics},
     tint::tint_diagnostics,
 };
 
 #[derive(Clone, Copy, Debug, Default)]
 pub enum NagaVersion {
-    Naga27,
     Naga28,
-    #[default]
     Naga29,
+    #[default]
+    Naga30,
     NagaMain,
 }
 
@@ -161,11 +161,37 @@ impl Diagnostic {
     }
 }
 
+/// Request parser level diagnostics for the given [`FileId`].
+///
+/// # Panics
+///
+/// Panics if the file is not found in the database.
+pub fn syntax_diagnostics(
+    db: &RootDatabase,
+    config: &DiagnosticsConfig,
+    file_id: FileId,
+) -> Vec<Diagnostic> {
+    let file_id = EditionedFileId::from_file(db, file_id);
+    let parse = file_id.parse(db);
+
+    if !config.parse_enabled {
+        return Vec::new();
+    }
+
+    parse
+        .errors()
+        .iter()
+        .map(|error| Diagnostic::new(DiagnosticCode("16"), error.message.clone(), error.range))
+        .collect()
+}
+
+/// Request semantic diagnostics for the given [`FileId`].
+///
 /// # Panics
 ///
 /// Panics if the file is not found in the database.
 #[expect(clippy::too_many_lines, reason = "TODO")]
-pub fn diagnostics(
+pub fn semantic_diagnostics(
     db: &RootDatabase,
     config: &DiagnosticsConfig,
     file_id: FileId,
@@ -174,19 +200,6 @@ pub fn diagnostics(
     let parse = file_id.parse(db);
 
     let mut diagnostics = Vec::new();
-
-    if config.parse_enabled {
-        diagnostics.extend(
-            parse
-                .errors()
-                .iter()
-                .map(|error| AnyDiagnostic::ParseError {
-                    message: error.message.clone(),
-                    range: error.range,
-                    file_id,
-                }),
-        );
-    }
 
     let semantics = Semantics::new(db);
 
@@ -199,14 +212,14 @@ pub fn diagnostics(
     let edition = file_id.edition(db);
     if edition == Edition::Wgsl && (config.naga_parsing_enabled || config.naga_validation_enabled) {
         match &config.naga_version {
-            NagaVersion::Naga27 => {
-                naga_diagnostics::<Naga27>(db, file_id, config, &mut diagnostics);
-            },
             NagaVersion::Naga28 => {
                 naga_diagnostics::<Naga28>(db, file_id, config, &mut diagnostics);
             },
             NagaVersion::Naga29 => {
                 naga_diagnostics::<Naga29>(db, file_id, config, &mut diagnostics);
+            },
+            NagaVersion::Naga30 => {
+                naga_diagnostics::<Naga30>(db, file_id, config, &mut diagnostics);
             },
             NagaVersion::NagaMain => {
                 naga_diagnostics::<NagaMain>(db, file_id, config, &mut diagnostics);
@@ -591,6 +604,22 @@ pub fn diagnostics(
             }
         })
         .collect()
+}
+
+/// Request both syntax and semantic diagnostics for the given [`FileId`].
+///
+/// # Panics
+///
+/// Panics if the file is not found in the database.
+pub fn full_diagnostics(
+    db: &RootDatabase,
+    config: &DiagnosticsConfig,
+    file_id: FileId,
+) -> Vec<Diagnostic> {
+    let mut result = syntax_diagnostics(db, config, file_id);
+    let semanatic_diagnostics = semantic_diagnostics(db, config, file_id);
+    result.extend(semanatic_diagnostics);
+    result
 }
 
 fn error_message_cause_chain(error: &dyn error::Error) -> String {
