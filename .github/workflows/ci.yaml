@@ -73,6 +73,7 @@ jobs:
               - 'xtask/src/dist_web.rs'
 
   no-ai-commits:
+    if: ${{ github.repository == 'wgsl-analyzer/wgsl-analyzer' }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
