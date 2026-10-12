@@ -286,21 +286,29 @@ fn attribute_arguments(
     if frame.opener == "(" && frame.start >= 2 && words[frame.start - 2] == "@" {
         let arguments = &words[frame.start + 1..];
         match (words[frame.start - 1], arguments) {
+            // Standard WGSL values of `wgsl_types::syntax::BuiltinValue`,
+            // without the naga extensions.
             ("builtin", []) => Some(ImmediateLocation::Enumerants(&[
                 "vertex_index",
                 "instance_index",
+                "clip_distances",
                 "position",
                 "front_facing",
                 "frag_depth",
+                "primitive_index",
                 "sample_index",
                 "sample_mask",
                 "local_invocation_id",
                 "local_invocation_index",
                 "global_invocation_id",
+                "global_invocation_index",
                 "workgroup_id",
+                "workgroup_index",
                 "num_workgroups",
                 "subgroup_invocation_id",
                 "subgroup_size",
+                "subgroup_id",
+                "num_subgroups",
             ])),
             ("interpolate", []) => Some(ImmediateLocation::Enumerants(&[
                 "perspective",
