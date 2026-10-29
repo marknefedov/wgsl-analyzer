@@ -135,7 +135,7 @@ jobs:
       #       ./crates/proc-macro-srv/proc-macro-test/imp -> target
 
       - name: Install nextest
-        uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
+        uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
         with:
           tool: nextest
 
@@ -249,7 +249,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install Tombi
-        uses: tombi-toml/setup-tombi@ebc771afde2bfb9192c91338a71b2c5d6152e2c3 # v1.8.4
+        uses: tombi-toml/setup-tombi@dbb85e6c7616772f590af0db4a7c455dfe61fec7 # v1.8.9
 
       - name: Lint TOML files
         run: tombi lint
@@ -314,7 +314,7 @@ jobs:
           RUSTFLAGS: -C debuginfo=0 -D warnings
 
       - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@3be4ad2b146f3302f92e5956c54fedbb6ae8cccc # v1.25.3
+        uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0
 
       - name: Install cargo-deadlinks
         run: cargo binstall cargo-deadlinks --no-confirm --locked
@@ -334,7 +334,7 @@ jobs:
           persist-credentials: false
 
       - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@3be4ad2b146f3302f92e5956c54fedbb6ae8cccc # v1.25.3
+        uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0
 
       - name: Install cargo-shear
         run: cargo binstall cargo-shear --no-confirm --locked
@@ -362,7 +362,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version-file: ./editors/code/package.json
+          node-version-file: ./.nvmrc
 
       - name: Enable Corepack
         run: |
@@ -438,7 +438,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version-file: ./js/package.json
+          node-version-file: ./.nvmrc
 
       - name: Enable Corepack
         run: |
@@ -533,7 +533,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version-file: ./js/package.json
+          node-version-file: ./.nvmrc
 
       - name: Enable Corepack
         run: |
