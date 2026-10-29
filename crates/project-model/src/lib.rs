@@ -13,16 +13,20 @@
 //! * Project discovery (where is the relevant `wesl.toml` for the current directory?)
 //! * Lowering of concrete model to a [`PackageGraph`]
 
+#![warn(unused)]
+
 mod manifest_path;
 mod package_graph;
 mod package_interner;
+#[cfg(test)]
+mod tests;
 mod wesl_package;
 mod wesl_toml;
+
 use std::{fmt, fs};
 
 use anyhow::{Context as _, bail, format_err};
 use base_db::input::PackageOrigin;
-use cargo_metadata::MetadataCommand;
 pub use manifest_path::ManifestPath;
 pub use package_graph::{PackageChange, PackageGraph, PackageKey};
 use paths::{AbsPath, AbsPathBuf};
@@ -75,8 +79,8 @@ impl ProjectManifest {
                 return Some(manifest);
             }
         }
-        let mut curr = Some(path);
-        while let Some(path) = curr {
+        let mut current = Some(path);
+        while let Some(path) = current {
             let candidate = target_file_names
                 .iter()
                 .map(|target_file_name| path.join(target_file_name))
@@ -88,7 +92,7 @@ impl ProjectManifest {
                 return Some(manifest);
             }
             if search_parents {
-                curr = path.parent();
+                current = path.parent();
             } else {
                 return None;
             }
