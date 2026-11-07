@@ -72,12 +72,12 @@ jobs:
             code-target: linux-armhf
             allocator: system
 
-          - os: macos-14
+          - os: macos-latest
             target: x86_64-apple-darwin
             code-target: darwin-x64
             allocator: system
 
-          - os: macos-14
+          - os: macos-latest
             target: aarch64-apple-darwin
             code-target: darwin-arm64
             allocator: system
