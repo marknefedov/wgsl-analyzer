@@ -42,6 +42,7 @@ jobs:
       typescript: ${{ steps.filter.outputs.typescript }}
       javascript: ${{ steps.filter.outputs.javascript }}
       emscripten: ${{ steps.filter.outputs.emscripten }}
+      nix: ${{ steps.filter.outputs.nix }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -56,8 +57,10 @@ jobs:
           filters: |
             typescript:
               - 'editors/code/**'
+              - '.github/workflows/ci.yaml'
             javascript:
               - 'js/**'
+              - '.github/workflows/ci.yaml'
             # Subdirectories rather than 'js/wgsl-analyzer-web/**', so a README
             # or biome-config edit does not trigger a full emscripten build.
             emscripten:
@@ -71,6 +74,16 @@ jobs:
               - 'js/wgsl-analyzer-web/tests/**'
               - 'js/examples/**'
               - 'xtask/src/dist_web.rs'
+              - '.github/workflows/ci.yaml'
+            nix:
+              - 'crates/**'
+              - 'xtask/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - '.cargo/**'
+              - 'flake.nix'
+              - 'flake.lock'
+              - '.github/workflows/ci.yaml'
 
   no-ai-commits:
     if: ${{ github.repository == 'wgsl-analyzer/wgsl-analyzer' }}
@@ -135,7 +148,7 @@ jobs:
       #       ./crates/proc-macro-srv/proc-macro-test/imp -> target
 
       - name: Install nextest
-        uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
+        uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
         with:
           tool: nextest
 
@@ -169,6 +182,10 @@ jobs:
 
       - name: Check formatting
         run: cargo fmt --all -- --check
+
+      - name: rustfmt info
+        if: failure()
+        run: echo 'To fix Rust formatting, run `cargo fmt --all`.'
 
   miri:
     runs-on: ubuntu-latest
@@ -234,7 +251,7 @@ jobs:
           persist-credentials: false
 
       - name: markdownlint
-        uses: DavidAnson/markdownlint-cli2-action@21c1be1b93ad9ed58fa840aacc3f279cde2a72ff # v24.2.0
+        uses: DavidAnson/markdownlint-cli2-action@696eb3f2509270d7b882d2aa68347bc676e7af34 # v25.0.0
         with:
           config: .markdownlint.jsonc
           globs: "**/*.md"
@@ -249,7 +266,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install Tombi
-        uses: tombi-toml/setup-tombi@dbb85e6c7616772f590af0db4a7c455dfe61fec7 # v1.8.9
+        uses: tombi-toml/setup-tombi@0dfa49a3889d194db37cdcd78abbe2e1771196cd # v1.9.6
 
       - name: Lint TOML files
         run: tombi lint
@@ -314,7 +331,7 @@ jobs:
           RUSTFLAGS: -C debuginfo=0 -D warnings
 
       - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0
+        uses: cargo-bins/cargo-binstall@81df5c23b0dc775b009efdfc9895c5965b7a4e40 # v1.26.1
 
       - name: Install cargo-deadlinks
         run: cargo binstall cargo-deadlinks --no-confirm --locked
@@ -334,7 +351,7 @@ jobs:
           persist-credentials: false
 
       - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0
+        uses: cargo-bins/cargo-binstall@81df5c23b0dc775b009efdfc9895c5965b7a4e40 # v1.26.1
 
       - name: Install cargo-shear
         run: cargo binstall cargo-shear --no-confirm --locked
@@ -569,9 +586,50 @@ jobs:
         run: pnpm --filter wgsl-analyzer-codemirror-example run build
         working-directory: ./js
 
+  nix:
+    name: Nix
+    needs: changes
+    if: needs.changes.outputs.nix == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install nix
+        uses: DeterminateSystems/nix-installer-action@9383ce2bf08796b65508822f5982f49151badc4e
+
+      - name: Install nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+        with:
+          # FlakeHub Cache needs OIDC, which pull requests from forks do not get.
+          use-flakehub: false
+
+      - name: Evaluate nix flake
+        run: nix flake check --no-build
+
+      - name: Build nix package
+        run: nix build .#checks.x86_64-linux.default --print-build-logs --no-link
+
+      - name: Nix info
+        if: failure()
+        run: |
+          echo 'Nix flake checks or builds failed.'
+          echo 'Does the flake need an update?'
+          echo 'To update the `flake.lock`, run `nix flake update`.'
+          echo 'To reproduce locally and see the full build logs, run `nix flake check -L`.'
+          echo 'To get more evaluation details, run `nix flake check --show-trace`.'
+          echo 'Fix the reported evaluation or build error.'
+          echo 'Then confirm `nix flake check` succeeds locally before trying again.'
+
   conclusion:
     needs:
       [
+        changes,
         no-ai-commits,
         rust,
         # rust-cross,
@@ -586,6 +644,7 @@ jobs:
         javascript,
         emscripten,
         wgslfmt-dprint-wasm,
+        nix,
       ]
     # We need to ensure this job does *not* get skipped if its dependencies fail,
     # because a skipped job is considered a success by GitHub. So we have to
